@@ -48,16 +48,17 @@ func (q *Queries) CreateEntry(ctx context.Context, arg *CreateEntryParams) (*Ent
 }
 
 const getBalance = `-- name: GetBalance :one
-SELECT
-    COALESCE(SUM(CASE WHEN direction = 'CREDIT' THEN amount ELSE 0 END), 0) -
-    COALESCE(SUM(CASE WHEN direction = 'DEBIT'  THEN amount ELSE 0 END), 0) AS balance
+SELECT (
+    COALESCE(SUM(CASE WHEN direction = 'CREDIT' THEN amount ELSE 0 END), 0::BIGINT) -
+    COALESCE(SUM(CASE WHEN direction = 'DEBIT'  THEN amount ELSE 0 END), 0::BIGINT)
+)::BIGINT AS balance
 FROM entries
 WHERE account_id = $1
 `
 
-func (q *Queries) GetBalance(ctx context.Context, accountID pgtype.UUID) (int32, error) {
+func (q *Queries) GetBalance(ctx context.Context, accountID pgtype.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, getBalance, accountID)
-	var balance int32
+	var balance int64
 	err := row.Scan(&balance)
 	return balance, err
 }
@@ -65,23 +66,23 @@ func (q *Queries) GetBalance(ctx context.Context, accountID pgtype.UUID) (int32,
 const getEntriesByAccount = `-- name: GetEntriesByAccount :many
 SELECT id, transaction_id, account_id, direction, amount, created_at FROM entries
 WHERE account_id = $1
-  AND (created_at, id) < ($2, $3)
+  AND (created_at, id) < ($2::timestamptz, $3::uuid)
 ORDER BY created_at DESC, id DESC
 LIMIT $4
 `
 
 type GetEntriesByAccountParams struct {
-	AccountID   pgtype.UUID        `json:"account_id"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	CreatedAt_2 pgtype.Timestamptz `json:"created_at_2"`
-	Limit       int32              `json:"limit"`
+	AccountID pgtype.UUID        `json:"account_id"`
+	Column2   pgtype.Timestamptz `json:"column_2"`
+	Column3   pgtype.UUID        `json:"column_3"`
+	Limit     int32              `json:"limit"`
 }
 
 func (q *Queries) GetEntriesByAccount(ctx context.Context, arg *GetEntriesByAccountParams) ([]*Entry, error) {
 	rows, err := q.db.Query(ctx, getEntriesByAccount,
 		arg.AccountID,
-		arg.CreatedAt,
-		arg.CreatedAt_2,
+		arg.Column2,
+		arg.Column3,
 		arg.Limit,
 	)
 	if err != nil {

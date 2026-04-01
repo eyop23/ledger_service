@@ -10,6 +10,6 @@ WHERE
     AND ($2::uuid        IS NULL OR entity_id   = $2)
     AND ($3::timestamptz IS NULL OR created_at  >= $3)
     AND ($4::timestamptz IS NULL OR created_at  <= $4)
-    AND (created_at, id) < ($5, $6)
+    AND (created_at, id) < ($5::timestamptz, $6::uuid)
 ORDER BY created_at DESC, id DESC
 LIMIT $7;

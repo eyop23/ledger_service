@@ -57,19 +57,19 @@ WHERE
     AND ($2::uuid        IS NULL OR entity_id   = $2)
     AND ($3::timestamptz IS NULL OR created_at  >= $3)
     AND ($4::timestamptz IS NULL OR created_at  <= $4)
-    AND (created_at, id) < ($5, $6)
+    AND (created_at, id) < ($5::timestamptz, $6::uuid)
 ORDER BY created_at DESC, id DESC
 LIMIT $7
 `
 
 type GetAuditLogsParams struct {
-	Column1     string             `json:"column_1"`
-	Column2     pgtype.UUID        `json:"column_2"`
-	Column3     pgtype.Timestamptz `json:"column_3"`
-	Column4     pgtype.Timestamptz `json:"column_4"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	CreatedAt_2 pgtype.Timestamptz `json:"created_at_2"`
-	Limit       int32              `json:"limit"`
+	Column1 string             `json:"column_1"`
+	Column2 pgtype.UUID        `json:"column_2"`
+	Column3 pgtype.Timestamptz `json:"column_3"`
+	Column4 pgtype.Timestamptz `json:"column_4"`
+	Column5 pgtype.Timestamptz `json:"column_5"`
+	Column6 pgtype.UUID        `json:"column_6"`
+	Limit   int32              `json:"limit"`
 }
 
 func (q *Queries) GetAuditLogs(ctx context.Context, arg *GetAuditLogsParams) ([]*AuditLog, error) {
@@ -78,8 +78,8 @@ func (q *Queries) GetAuditLogs(ctx context.Context, arg *GetAuditLogsParams) ([]
 		arg.Column2,
 		arg.Column3,
 		arg.Column4,
-		arg.CreatedAt,
-		arg.CreatedAt_2,
+		arg.Column5,
+		arg.Column6,
 		arg.Limit,
 	)
 	if err != nil {
