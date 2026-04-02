@@ -396,14 +396,14 @@ func TestAuditLog_RejectedTransaction(t *testing.T) {
 	src, _ := accountSvc.CreateAccount(ctx, "USD", "test-actor")
 	dst, _ := accountSvc.CreateAccount(ctx, "USD", "test-actor")
 
-	// This will fail — src has no funds
+	// This will fail — debits do not equal credits
 	_, err := txnSvc.PostTransaction(ctx, &dto.CreateTransactionRequest{
 		IdempotencyKey: "audit-rejected",
 		Amount:         9999,
 		Currency:       "USD",
 		Entries: []dto.EntryRequest{
 			{AccountID: uuid.UUID(src.ID.Bytes).String(), Direction: "DEBIT", Amount: 9999},
-			{AccountID: uuid.UUID(dst.ID.Bytes).String(), Direction: "CREDIT", Amount: 9999},
+			{AccountID: uuid.UUID(dst.ID.Bytes).String(), Direction: "CREDIT", Amount: 1},
 		},
 	}, "test-actor")
 	require.Error(t, err)
