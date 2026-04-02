@@ -12,7 +12,6 @@ A double-entry bookkeeping API built in Go. Every transaction posts two or more 
 ### Start the service
 
 ```bash
-cp .env.example .env
 docker compose up --build
 ```
 
@@ -85,8 +84,17 @@ Transactions are posted inside a `REPEATABLE READ` database transaction. This pr
 ### Cursor-based pagination
 Entry listing uses `(created_at, id)` as a composite cursor instead of page offsets. This avoids the problem of entries shifting between pages when new data is inserted. The cursor is base64-encoded and passed as a query parameter.
 
-### Audit log completeness
-Every operation — including rejected transactions — writes an audit record. The audit write for a successful transaction happens **inside the same database transaction** as the entries. If the audit write fails, the entire transaction rolls back: money never moves without a record.
+### Audit log completeness and audit-write trade-off
+
+Every operation — including rejected transactions — writes an audit record.
+
+**Decision:** the audit write always blocks the operation if it fails — there is no silent best-effort logging.
+
+- **Posted transactions:** the audit write happens inside the same database transaction as the entries (`qtx`, which shares the open `tx`). If the audit write fails, `tx.Rollback` is called and both the transaction row and all entries are undone. Money never moves without a record.
+- **Rejected transactions:** `rejectWithAudit` only writes one thing — the audit record. No transaction row or entries are inserted (the request was rejected before any money-related DB writes). If the audit write fails, the service returns `500` instead of the business error. The caller cannot tell the difference, but the rejection itself has no state to roll back.
+- **Account creation:** the audit write is a separate DB call after the account insert. If it fails, the account already exists — no rollback. This is an acceptable trade-off since no money moves on account creation.
+
+**Trade-off:** tying the audit write inside the DB transaction guarantees completeness at the cost of slightly higher latency. The alternative — async or best-effort audit — would be faster but risks losing records on crash, which is unacceptable for a financial ledger.
 
 ### Structured logging and metrics
 All requests are logged as JSON using `slog` with request ID, actor, method, path, status, and latency. Prometheus metrics are exposed at `/metrics` — request counts by method/path/status and latency histograms.
