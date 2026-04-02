@@ -85,22 +85,6 @@ func (s *TransactionService) PostTransaction(ctx context.Context, req *dto.Creat
 		accountIDs[e.AccountID] = pgID
 	}
 
-	// Check sufficient funds for each DEBIT entry
-	for _, e := range req.Entries {
-		if e.Direction != "DEBIT" {
-			continue
-		}
-		balance, err := s.queries.GetBalance(ctx, accountIDs[e.AccountID])
-		if err != nil {
-			return nil, fmt.Errorf("get balance for %s: %w", e.AccountID, err)
-		}
-		if balance < e.Amount {
-			return s.rejectWithAudit(ctx, req, actor, dto.ErrInsufficientFunds,
-				fmt.Sprintf("account %s has insufficient funds (balance %d, need %d)",
-					e.AccountID, balance, e.Amount))
-		}
-	}
-
 	// --- Step 2: REPEATABLE READ transaction with retry ---
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
@@ -241,7 +225,7 @@ func (s *TransactionService) fetchByIdempotencyKey(ctx context.Context, key stri
 	if err != nil {
 		return nil, fmt.Errorf("fetch original entries: %w", err)
 	}
-	return &TransactionResult{Transaction: txn, Entries: entries}, nil
+	return &TransactionResult{Transaction: txn, Entries: entries, Replayed: true}, nil
 }
 
 func buildPostedPayload(txn *db.Transaction, entries []*db.Entry) map[string]any {
